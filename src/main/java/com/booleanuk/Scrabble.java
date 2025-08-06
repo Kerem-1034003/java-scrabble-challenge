@@ -2,7 +2,7 @@ package com.booleanuk;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Stack;
+
 
 public class Scrabble {
     private final String word;
@@ -29,68 +29,47 @@ public class Scrabble {
         }
 
         String input = word.toUpperCase();
-        return scoreRecursive(input, 0, input.length()).score;
+        return scoreRecursive(input, 0, input.length(), 1);
     }
 
-    private Result scoreRecursive(String input, int start, int end) {
-        int totalScore = 0;
-        int i = start;
-        Stack<Integer> wordMultipliers = new Stack<>();
-        wordMultipliers.push(1);
+    private int scoreRecursive(String input, int start, int end, int multiplier) {
+        int score = 0;
 
-        while (i < end) {
+        for (int i = start; i < end; i++) {
             char c = input.charAt(i);
 
             if (c == '{' || c == '[') {
+                char openChar = c;
+                char closeChar = (c == '{') ? '}' : ']';
+                int closeIndex = findClosing(input, i, end, openChar, closeChar);
 
-                char closing = (c == '{') ? '}' : ']';
-                int closeIndex = findClosing(input, i, end, c, closing);
-                if (closeIndex == -1) return new Result(0, end);
+                if (closeIndex == -1) return 0;
 
-                String inside = input.substring(i + 1, closeIndex);
+                String sub = input.substring(i + 1, closeIndex);
 
-                if (inside.isEmpty()) return new Result(0, end);
+                if (!isValidStructure(sub)) return 0;
 
-                int multiplier = (c == '{') ? 2 : 3;
-
-
-                if (inside.length() == 1) {
-                    char letter = inside.charAt(0);
-                    if (!letterScores.containsKey(letter)) return new Result(0, end);
-                    totalScore += letterScores.get(letter) * multiplier;
+                if (sub.length() == 1 && Character.isLetter(sub.charAt(0))) {
+                    int letterScore = getScore(Character.toLowerCase(sub.charAt(0)));
+                    score += letterScore * (openChar == '{' ? 2 : 3);
+                }
+                else if (sub.equals(input.substring(start + 1, end - 1))) {
+                    int innerScore = scoreRecursive(sub, 0, sub.length(), 1);
+                    score += innerScore * (openChar == '{' ? 2 : 3);
+                    return score * multiplier;
                 } else {
-
-                    Result innerResult = scoreRecursive(inside, 0, inside.length());
-                    if (innerResult.score == 0) return new Result(0, end);
-                    totalScore += innerResult.score * multiplier;
+                    return 0;
                 }
 
-                i = closeIndex + 1;
-            } else if (c == '(' || c == '<') {
-
-                char closing = (c == '(') ? ')' : '>';
-                int closeIndex = findClosing(input, i, end, c, closing);
-                if (closeIndex == -1) return new Result(0, end);
-
-                String inside = input.substring(i + 1, closeIndex);
-                if (inside.isEmpty()) return new Result(0, end);
-
-                int multiplier = (c == '(') ? 2 : 3;
-
-                Result innerResult = scoreRecursive(inside, 0, inside.length());
-                if (innerResult.score == 0) return new Result(0, end);
-                totalScore += innerResult.score * multiplier;
-
-                i = closeIndex + 1;
+                i = closeIndex;
+            } else if (Character.isLetter(c)) {
+                score += getScore(Character.toLowerCase(c)) * multiplier;
             } else {
-
-                if (!letterScores.containsKey(c)) return new Result(0, end);
-                totalScore += letterScores.get(c);
-                i++;
+                return 0;
             }
         }
 
-        return new Result(totalScore, i);
+        return score * multiplier;
     }
 
     private int findClosing(String input, int start, int end, char openChar, char closeChar) {
@@ -106,13 +85,20 @@ public class Scrabble {
         return -1;
     }
 
-    private static class Result {
-        int score;
-        int nextIndex;
+    private boolean isValidStructure(String str) {
+        int curly = 0, square = 0;
+        for (char ch : str.toCharArray()) {
+            if (ch == '{') curly++;
+            if (ch == '}') curly--;
+            if (ch == '[') square++;
+            if (ch == ']') square--;
 
-        Result(int score, int nextIndex) {
-            this.score = score;
-            this.nextIndex = nextIndex;
+            if (curly < 0 || square < 0) return false;
         }
+        return curly == 0 && square == 0;
+    }
+
+    private int getScore(char c) {
+        return letterScores.getOrDefault(Character.toUpperCase(c), 0);
     }
 }
